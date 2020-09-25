@@ -1,0 +1,105 @@
+---
+title: "map_test"
+author: "Dashiell Nusbaum"
+date: "5/18/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(rvest)
+library(janitor)
+library(plotly)
+```
+
+# color and z important
+```{r}
+df <- read_csv("exclusionscale_DN_06_12_2020.csv")
+df %>%
+  filter(year >= 2000 & year <= 2016) ->
+  df
+
+state_coords<-read_csv("state_coords_2.csv")
+left_join(df,state_coords,by="stabb") ->
+  df
+df %>%
+  mutate(`Exclusion Score`=exclusionscale2) ->
+  df
+
+# common plot options
+g <- list(
+  showframe = F,
+  showland = T,
+  landcolor = toRGB("grey90"),
+  showlakes = TRUE,
+  lakecolor = toRGB('white')
+)
+
+g1 <- c(
+  g,
+  resolution = 50,
+  showcoastlines = T,
+  countrycolor = toRGB("white"),
+  coastlinecolor = toRGB("white"),
+  projection = list(type = 'albers usa'),
+  list(lonaxis = list(range = c(-77.15, -76.9))),
+  list(lataxis = list(range = c(38.79, 39.03))),
+  list(domain = list(x = c(0.9, 1), y = c(0.5, 0.6)))
+)
+
+g2 <- c(
+  g,
+  scope = 'usa',
+  showcountries = F,
+  bgcolor = toRGB("white", alpha = 0),
+  list(domain = list(x = c(0, 0.9), y = c(0, 0.9)))
+)
+
+fig <- df %>% plot_geo(
+    locationmode = 'USA-states', sizes = c(1, 600), color = I("black")
+  )
+
+
+fig <- fig %>% add_trace(hoverinfo="text",hovertext=paste(df$stabb, "\n", df$`Exclusion Score`),
+     color = ~`Exclusion Score`,z = ~`Exclusion Score`, locations = ~stabb, colors = 'Reds',
+    showscale = F, geo = "geo2",
+    frame = ~year,
+    showlegend = FALSE
+  )
+
+
+fig <- fig %>% add_markers(
+    y = ~Lat, x = ~Long, locations = ~stabb,
+    size = 0.5, color = ~`Exclusion Score`, colors = 'Reds', hoverinfo="text",hovertext=paste(df$stabb, "\n", df$`Exclusion Score`),
+    frame = ~year,
+    showlegend=FALSE
+  )
+
+
+fig %>%
+  animation_opts(frame=750,transition = 0) %>%
+  animation_slider(
+    currentvalue = list(prefix = "Year: ", font = list(color="black",size=20))) ->
+  fig
+
+fig %>%
+  colorbar(z=~df$`Exclusion Score`, limits = c(min(df$exclusionscale2),max(df$exclusionscale2))) ->
+  fig
+
+fig <- fig %>% layout(
+    title = 'State Exclusion Score By Year',
+    geo = g1, geo2 = g2
+  )
+
+fig
+```
+
+```{r}
+htmlwidgets::saveWidget(fig, "imm_exclusion_by_year.html") 
+```
+
